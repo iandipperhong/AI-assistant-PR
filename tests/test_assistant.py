@@ -59,3 +59,46 @@ def test_explain_llm_error():
     assert "모델 이름" in explain_llm_error(Exception("404 NOT_FOUND. models/gemini-x is not found"))
     assert "지역" in explain_llm_error(Exception("400 FAILED_PRECONDITION. User location is not supported"))
     assert "AIza" not in explain_llm_error(Exception("weird AIzaSyABCDEFGHIJKLMNOP error"))
+
+
+@pytest.mark.asyncio
+async def test_memory_guidelines_and_identity(session):
+    llm = FakeLLM(json.dumps({"action": "save_guideline", "reply": "응 알겠어!", "data": {"text": "반말로 말하기"}}))
+    reply = await handle_message(llm, session, 1, "앞으로 반말로 해줘", NOW)
+    assert "지침 #" in reply and "반말로 말하기" in reply
+
+    llm2 = FakeLLM(json.dumps({"action": "answer", "reply": "응, 나 기억해"}))
+    await handle_message(llm2, session, 1, "내 말 기억해?", NOW)
+    prompt = llm2.prompts[0]
+    # 지침과 앞 대화가 같이 들어감, 다른 사용자 것은 안 들어감
+    assert "반말로 말하기" in prompt and "앞으로 반말로 해줘" in prompt
+    await handle_message(FakeLLM(json.dumps({"action": "answer", "reply": "x"})), session, 2, "남의 대화", NOW)
+    llm3 = FakeLLM(json.dumps({"action": "answer", "reply": "ok"}))
+    await handle_message(llm3, session, 1, "다시", NOW)
+    assert "남의 대화" not in llm3.prompts[0]
+
+    gid = repo.list_guidelines(session, 1)[0].id
+    out = await handle_message(FakeLLM(json.dumps({"action": "delete_guideline", "reply": "지웠어", "data": {"id": gid}})),
+                               session, 1, "지침 지워", NOW)
+    assert out == "지웠어" and repo.list_guidelines(session, 1) == []
+
+
+def test_system_prompt_names_model():
+    from app.assistant import SYSTEM_PROMPT
+    assert "Google Gemini (gemini-3.5-flash-lite)" in SYSTEM_PROMPT.format(model="Google Gemini (gemini-3.5-flash-lite)")
+
+
+def test_chat_history_is_trimmed(session):
+    for i in range(50):
+        repo.add_chat(session, 1, "user", f"m{i}", NOW, keep=40)
+    rows = repo.recent_chat(session, 1, 100)
+    assert len(rows) == 40 and rows[0].text == "m10" and rows[-1].text == "m49"
+
+
+def test_guideline_commands():
+    from app.bot import commands as cmd
+    assert "지침 #" in cmd.guideline_add(9, "존댓말 금지")
+    assert "존댓말 금지" in cmd.guidelines_text(9)
+    assert "찾지 못했어요" in cmd.guideline_delete(8, [1])
+    assert "1개를 지웠어요" in cmd.guideline_delete(9, [1])
+    assert "지웠어요" in cmd.chat_clear(9)

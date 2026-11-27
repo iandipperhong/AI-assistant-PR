@@ -54,6 +54,11 @@ class Settings:
     )
     calendar_alert_hour: int = int(os.getenv("CALENDAR_ALERT_HOUR", "9"))
 
+    # 대화 기억: 사용자당 저장할 메시지 수 (내 말 + 봇 답 합계), AI 에 같이 보낼 수
+    chat_history_limit: int = int(os.getenv("CHAT_HISTORY_LIMIT", "40"))
+    chat_context_messages: int = int(os.getenv("CHAT_CONTEXT_MESSAGES", "16"))
+    max_guidelines: int = int(os.getenv("MAX_GUIDELINES", "20"))
+
     @property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)

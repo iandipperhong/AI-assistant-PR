@@ -30,6 +30,9 @@ class GeminiProvider(LLMProvider):
         self._client = genai.Client(api_key=api_key)
         self._models = [model] + [m for m in FALLBACK_MODELS if m != model]
 
+    def describe(self) -> str:
+        return f"Google Gemini ({self._models[0]})"
+
     async def _call(self, model: str, system: str, prompt: str, json_mode: bool) -> str:
         from google.genai import types
 

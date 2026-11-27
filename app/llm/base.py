@@ -15,6 +15,10 @@ class LLMError(RuntimeError):
 class LLMProvider(ABC):
     name: str = "base"
 
+    def describe(self) -> str:
+        """'너 무슨 AI야?' 에 답할 때 쓰는 이름."""
+        return self.name
+
     @abstractmethod
     async def generate(self, system: str, prompt: str, *, json_mode: bool = False) -> str:
         """system 지시문과 사용자 prompt 를 받아 텍스트(또는 JSON 문자열)를 돌려줍니다."""
