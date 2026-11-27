@@ -110,9 +110,10 @@ def grad_add(user_id: int, name: str, credits: str | None, category: str | None)
     name = name.strip()
     if not name:
         raise ParseError("과목 이름을 적어 주세요")
-    raw = (credits or "").strip() or str(cur.DEFAULT_CREDITS)
-    if not raw.isdigit() or not 0 < int(raw) <= 9:
-        raise ParseError("학점은 1~9 사이 숫자로 적어 주세요")
+    known = cur.find_course(name)
+    raw = (credits or "").strip() or str(known.credits if known else cur.DEFAULT_CREDITS)
+    if not raw.isdigit() or not 0 <= int(raw) <= 9:
+        raise ParseError("학점은 0~9 사이 숫자로 적어 주세요")
     category = _pick_category(category, name)
     with session_scope() as s:
         row = repo.add_completed_course(s, user_id, name, int(raw), category)
@@ -129,13 +130,14 @@ def grad_quick_add(user_id: int, names: list[str]) -> str:
         for name in names:
             if cur.normalize(name) in have:
                 continue
-            repo.add_completed_course(s, user_id, name, cur.DEFAULT_CREDITS, _pick_category(None, name))
+            known = cur.find_course(name)
+            repo.add_completed_course(s, user_id, known.name if known else name,
+                                      known.credits if known else cur.DEFAULT_CREDITS, _pick_category(None, name))
             have.add(cur.normalize(name))
             added.append(name)
     if not added:
         return "이미 다 들어 있어요."
-    return (f"{len(added)}과목 추가했어요: {', '.join(added)}\n"
-            f"(학점은 {cur.DEFAULT_CREDITS}학점으로 넣었어요. 다르면 삭제 후 ✏️ 직접 입력으로 넣어 주세요)")
+    return f"{len(added)}과목 추가했어요: {', '.join(added)}\n(학점·구분은 2024 교과과정 기준으로 넣었어요)"
 
 
 def grad_delete(user_id: int, course_ids: list[int]) -> str:
@@ -149,11 +151,8 @@ def _pick_category(category: str | None, name: str) -> str:
 
     category = (category or "").strip().replace(" ", "")
     if not category:
-        if cur.normalize(name) in {cur.normalize(c) for c in cur.REQUIRED_COURSES}:
-            return "전공필수"
-        if cur.normalize(name) in {cur.normalize(c) for c in cur.ALL_MAJOR_COURSES}:
-            return "전공선택"
-        return "교양선택"
+        known = cur.find_course(name)
+        return known.category if known else "교양선택"
     aliases = {"전필": "전공필수", "전선": "전공선택", "교필": "교양필수", "교선": "교양선택", "일선": "일반선택"}
     category = aliases.get(category, category)
     if category not in cur.CATEGORIES:

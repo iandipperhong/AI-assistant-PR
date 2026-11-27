@@ -109,13 +109,17 @@ def test_format_menu_empty_and_full():
 
 def test_graduation_flow():
     text = cmd.grad_summary(7)
-    assert "요람 확인 필요" in text and "조경학개론" in text
-    assert "2과목 추가" in cmd.grad_quick_add(7, ["조경학개론", "기초설계"])
+    assert "총: 0 / 130학점" in text and "조경학개론" in text
+    assert "2과목 추가" in cmd.grad_quick_add(7, ["조경학개론", "조경수목의이해"])
     assert "이미 다" in cmd.grad_quick_add(7, ["조경학 개론"])  # 띄어쓰기 달라도 중복
     assert "교양필수, 2학점" in cmd.grad_add(7, "대학영어", "2", "교필")
     text = cmd.grad_summary(7)
-    assert "총: 8학점" in text and "조경학개론" not in text.split("1학년:")[1].split("\n")[0]
-    assert "기초컴퓨터설계" in text
+    # 조경학개론 2 + 조경수목의이해 3(전필) + 대학영어 2
+    assert "총: 7 / 130학점 · 123학점 남음" in text
+    assert "전공필수: 3 / 16학점 · 13학점 남음" in text
+    assert "조경학개론" not in text.split("1학년:")[1].split("\n")[0]
+    assert "조경계획" in text.split("전공필수 미이수**")[1]
+    assert "평점 2.00" in text
     # 다른 사람 과목은 못 지움
     assert "찾지 못했어요" in cmd.grad_delete(8, [1])
     assert "1과목 삭제" in cmd.grad_delete(7, [1])
@@ -143,15 +147,29 @@ def test_grad_add_validation():
         cmd.grad_add(7, "과목", "열", None)
     with pytest.raises(ParseError):
         cmd.grad_add(7, "과목", "3", "아무거나")
-    assert "전공선택" in cmd.grad_add(7, "조경계획", "", "")
+    assert "전공필수, 3학점" in cmd.grad_add(7, "조경계획", "", "")
+    assert "전공선택, 6학점" in cmd.grad_add(7, "도시 및 공공공간설계 스튜디오", "", "")
+    assert "교양선택, 3학점" in cmd.grad_add(7, "철학의이해", "", "")
 
 
 def test_curriculum_aliases_and_semesters():
     from app.campus import landscape_curriculum as cur
 
-    assert set(cur.SEMESTERS) <= {cur.normalize(c) for c in cur.ALL_MAJOR_COURSES}
+    assert sum(c.credits for c in cur.COURSES if c.category == "전공필수") == cur.GRAD_RULES["전공필수"]
+    assert all(len(cur.CURRICULUM[y]) <= 25 for y in cur.CURRICULUM)
+    assert len(cur.CURRICULUM[1]) + len(cur.CURRICULUM[2]) <= 25
+    assert len(cur.CURRICULUM[3]) + len(cur.CURRICULUM[4]) <= 25
     assert cur.normalize("공원 및 오픈스페이스설계 스튜디오") == cur.normalize("공원및그린네트워크설계스튜디오")
     assert cur.semester_label("조경 캡스톤디자인") == "4학년 1학기"
-    assert cur.semester_label("환경심리학") is None
+    assert cur.semester_label("환경심리학") == "1학년 2학기"
+    assert cur.GRAD_RULES["교양필수"] == 13  # 2024 입학생
+    assert cur.semester_label("모르는과목") is None
     cmd.grad_quick_add(7, ["단지및커뮤니티공간설계스튜디오"])
     assert "이미 다" in cmd.grad_quick_add(7, ["단지 및 기반시설설계 스튜디오"])
+
+
+def test_liberal_arts_cap():
+    for i in range(17):
+        cmd.grad_add(7, f"교양{i}", "3", "교선")  # 51학점
+    text = cmd.grad_summary(7)
+    assert "총: 48 / 130학점" in text and "48학점까지만" in text
