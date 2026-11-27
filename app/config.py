@@ -27,7 +27,7 @@ class Settings:
 
     llm_provider: str = os.getenv("LLM_PROVIDER", "gemini").lower()
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     claude_model: str = os.getenv("CLAUDE_MODEL", "claude-haiku-5-5")
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
