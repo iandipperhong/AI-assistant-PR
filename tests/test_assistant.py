@@ -49,3 +49,13 @@ async def test_bad_payload_and_llm_error(session):
     bad = FakeLLM(json.dumps({"action": "add_exam", "data": {"course": "OS"}}))
     assert "명령어로" in await handle_message(bad, session, 1, "시험 등록", NOW)
     assert "AI 응답" in await handle_message(FakeLLM(error=True), session, 1, "안녕", NOW)
+
+
+def test_explain_llm_error():
+    from app.llm.base import explain_llm_error
+
+    assert "키가 틀렸" in explain_llm_error(Exception("400 INVALID_ARGUMENT. API key not valid. Please pass a valid API key."))
+    assert "한도" in explain_llm_error(Exception("429 RESOURCE_EXHAUSTED"))
+    assert "모델 이름" in explain_llm_error(Exception("404 NOT_FOUND. models/gemini-x is not found"))
+    assert "지역" in explain_llm_error(Exception("400 FAILED_PRECONDITION. User location is not supported"))
+    assert "AIza" not in explain_llm_error(Exception("weird AIzaSyABCDEFGHIJKLMNOP error"))
