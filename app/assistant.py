@@ -37,15 +37,15 @@ SYSTEM_PROMPT = """너는 서울시립대학교 학생의 대학생활 비서야
 """
 
 
-def build_context(s: Session, chat_id: int, now: datetime) -> str:
+def build_context(s: Session, user_id: int, now: datetime) -> str:
     lines = [f"현재 시각: {now:%Y-%m-%d %H:%M} ({WEEKDAYS[now.weekday()]}요일)", "", "[시간표]"]
-    classes = repo.list_classes(s, chat_id)
+    classes = repo.list_classes(s, user_id)
     lines += [f"- {c.describe()}" for c in classes] or ["- (없음)"]
     lines += ["", "[다가오는 과제 (30일)]"]
-    hws = repo.list_assignments(s, chat_id, now, until=now + timedelta(days=30))
+    hws = repo.list_assignments(s, user_id, now, until=now + timedelta(days=30))
     lines += [f"- {a.describe()}" for a in hws] or ["- (없음)"]
     lines += ["", "[다가오는 시험 (60일)]"]
-    exams = repo.list_exams(s, chat_id, now, until=now + timedelta(days=60))
+    exams = repo.list_exams(s, user_id, now, until=now + timedelta(days=60))
     lines += [f"- {e.describe()}" for e in exams] or ["- (없음)"]
     return "\n".join(lines)
 
@@ -62,13 +62,13 @@ def _parse_dt(value: str) -> datetime:
     return datetime.strptime(value.strip(), "%Y-%m-%d %H:%M")
 
 
-async def handle_message(llm: LLMProvider, s: Session, chat_id: int, text: str, now: datetime) -> str:
-    prompt = f"{build_context(s, chat_id, now)}\n\n[사용자 메시지]\n{text}"
+async def handle_message(llm: LLMProvider, s: Session, user_id: int, text: str, now: datetime) -> str:
+    prompt = f"{build_context(s, user_id, now)}\n\n[사용자 메시지]\n{text}"
     try:
         raw = await llm.generate(SYSTEM_PROMPT, prompt, json_mode=True)
     except LLMError as exc:
         log.warning("LLM error: %s", exc)
-        return "지금은 AI 응답을 받을 수 없어요. /help 의 명령어로는 계속 쓸 수 있어요."
+        return "지금은 AI 응답을 받을 수 없어요. `/help` 의 명령어로는 계속 쓸 수 있어요."
 
     try:
         result = _extract_json(raw)
@@ -81,21 +81,21 @@ async def handle_message(llm: LLMProvider, s: Session, chat_id: int, text: str, 
 
     try:
         if action == "add_assignment":
-            row = repo.add_assignment(s, chat_id, title=data["title"], due_at=_parse_dt(data["due"]),
+            row = repo.add_assignment(s, user_id, title=data["title"], due_at=_parse_dt(data["due"]),
                                       course=data.get("course"))
-            return f"과제를 등록했어요: {row.describe()}\n잘못됐으면 /del hw {row.id}"
+            return f"과제를 등록했어요: {row.describe()}\n잘못됐으면 `/del` 과제 {row.id}"
         if action == "add_exam":
-            row = repo.add_exam(s, chat_id, course=data["course"], starts_at=_parse_dt(data["starts"]),
+            row = repo.add_exam(s, user_id, course=data["course"], starts_at=_parse_dt(data["starts"]),
                                 title=data.get("title") or "시험", location=data.get("location"))
-            return f"시험을 등록했어요: {row.describe()}\n잘못됐으면 /del exam {row.id}"
+            return f"시험을 등록했어요: {row.describe()}\n잘못됐으면 `/del` 시험 {row.id}"
         if action == "add_class":
             start, end = parse_time_range(data["time"])
-            row = repo.add_class(s, chat_id, course=data["course"], weekday=parse_weekday(data["weekday"]),
+            row = repo.add_class(s, user_id, course=data["course"], weekday=parse_weekday(data["weekday"]),
                                  start=start, end=end, location=data.get("location"))
-            return f"시간표에 추가했어요: {row.describe()}\n잘못됐으면 /del class {row.id}"
+            return f"시간표에 추가했어요: {row.describe()}\n잘못됐으면 `/del` 수업 {row.id}"
     except (KeyError, ValueError, ParseError) as exc:
         log.info("LLM add payload invalid: %s / %s", exc, data)
-        return "등록하려는 내용을 정확히 못 읽었어요. 명령어로 등록해 주세요 (/help)."
+        return "등록하려는 내용을 정확히 못 읽었어요. 명령어로 등록해 주세요 (`/help`)."
 
     return reply or "음, 잘 이해하지 못했어요."
 

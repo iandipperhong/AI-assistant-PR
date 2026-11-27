@@ -18,9 +18,11 @@ def _int_list(value: str | None, default: list[int]) -> list[int]:
 
 @dataclass(frozen=True)
 class Settings:
-    telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    allowed_chat_ids: frozenset[int] = field(
-        default_factory=lambda: frozenset(_int_list(os.getenv("ALLOWED_CHAT_IDS"), []))
+    discord_bot_token: str = os.getenv("DISCORD_BOT_TOKEN", "")
+    # 슬래시 명령어를 즉시 반영할 서버 ID (비우면 전역 등록: 반영까지 최대 1시간)
+    discord_guild_id: int | None = int(os.getenv("DISCORD_GUILD_ID")) if os.getenv("DISCORD_GUILD_ID") else None
+    allowed_user_ids: frozenset[int] = field(
+        default_factory=lambda: frozenset(_int_list(os.getenv("ALLOWED_USER_IDS"), []))
     )
 
     llm_provider: str = os.getenv("LLM_PROVIDER", "gemini").lower()

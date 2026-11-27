@@ -10,34 +10,34 @@ from app.models import Assignment, ClassSession, Exam, SentReminder
 
 
 # ---------- 시간표 ----------
-def add_class(s: Session, chat_id: int, course: str, weekday: int, start: time, end: time,
+def add_class(s: Session, user_id: int, course: str, weekday: int, start: time, end: time,
               location: str | None = None) -> ClassSession:
-    row = ClassSession(chat_id=chat_id, course=course, weekday=weekday, start=start, end=end,
+    row = ClassSession(user_id=user_id, course=course, weekday=weekday, start=start, end=end,
                        location=location)
     s.add(row)
     s.flush()
     return row
 
 
-def list_classes(s: Session, chat_id: int, weekday: int | None = None) -> list[ClassSession]:
-    q = select(ClassSession).where(ClassSession.chat_id == chat_id)
+def list_classes(s: Session, user_id: int, weekday: int | None = None) -> list[ClassSession]:
+    q = select(ClassSession).where(ClassSession.user_id == user_id)
     if weekday is not None:
         q = q.where(ClassSession.weekday == weekday)
     return list(s.scalars(q.order_by(ClassSession.weekday, ClassSession.start)))
 
 
 # ---------- 과제 ----------
-def add_assignment(s: Session, chat_id: int, title: str, due_at: datetime,
+def add_assignment(s: Session, user_id: int, title: str, due_at: datetime,
                    course: str | None = None, note: str | None = None) -> Assignment:
-    row = Assignment(chat_id=chat_id, title=title, due_at=due_at, course=course, note=note)
+    row = Assignment(user_id=user_id, title=title, due_at=due_at, course=course, note=note)
     s.add(row)
     s.flush()
     return row
 
 
-def list_assignments(s: Session, chat_id: int, now: datetime, include_done: bool = False,
+def list_assignments(s: Session, user_id: int, now: datetime, include_done: bool = False,
                      until: datetime | None = None) -> list[Assignment]:
-    q = select(Assignment).where(Assignment.chat_id == chat_id, Assignment.due_at >= now)
+    q = select(Assignment).where(Assignment.user_id == user_id, Assignment.due_at >= now)
     if not include_done:
         q = q.where(Assignment.done.is_(False))
     if until is not None:
@@ -45,25 +45,25 @@ def list_assignments(s: Session, chat_id: int, now: datetime, include_done: bool
     return list(s.scalars(q.order_by(Assignment.due_at)))
 
 
-def mark_assignment_done(s: Session, chat_id: int, assignment_id: int) -> Assignment | None:
+def mark_assignment_done(s: Session, user_id: int, assignment_id: int) -> Assignment | None:
     row = s.get(Assignment, assignment_id)
-    if row is None or row.chat_id != chat_id:
+    if row is None or row.user_id != user_id:
         return None
     row.done = True
     return row
 
 
 # ---------- 시험 ----------
-def add_exam(s: Session, chat_id: int, course: str, starts_at: datetime, title: str = "시험",
+def add_exam(s: Session, user_id: int, course: str, starts_at: datetime, title: str = "시험",
              location: str | None = None) -> Exam:
-    row = Exam(chat_id=chat_id, course=course, starts_at=starts_at, title=title, location=location)
+    row = Exam(user_id=user_id, course=course, starts_at=starts_at, title=title, location=location)
     s.add(row)
     s.flush()
     return row
 
 
-def list_exams(s: Session, chat_id: int, now: datetime, until: datetime | None = None) -> list[Exam]:
-    q = select(Exam).where(Exam.chat_id == chat_id, Exam.starts_at >= now)
+def list_exams(s: Session, user_id: int, now: datetime, until: datetime | None = None) -> list[Exam]:
+    q = select(Exam).where(Exam.user_id == user_id, Exam.starts_at >= now)
     if until is not None:
         q = q.where(Exam.starts_at <= until)
     return list(s.scalars(q.order_by(Exam.starts_at)))
@@ -73,12 +73,12 @@ def list_exams(s: Session, chat_id: int, now: datetime, until: datetime | None =
 MODELS = {"class": ClassSession, "hw": Assignment, "exam": Exam}
 
 
-def delete_item(s: Session, chat_id: int, kind: str, item_id: int) -> bool:
+def delete_item(s: Session, user_id: int, kind: str, item_id: int) -> bool:
     model = MODELS.get(kind)
     if model is None:
         return False
     row = s.get(model, item_id)
-    if row is None or row.chat_id != chat_id:
+    if row is None or row.user_id != user_id:
         return False
     s.delete(row)
     return True

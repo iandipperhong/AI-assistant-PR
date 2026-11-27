@@ -20,7 +20,7 @@ class ClassSession(Base):
     __tablename__ = "class_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     course: Mapped[str] = mapped_column(String(100))
     weekday: Mapped[int] = mapped_column(Integer)  # 0=월 ... 6=일
     start: Mapped[time] = mapped_column(Time)
@@ -36,7 +36,7 @@ class Assignment(Base):
     __tablename__ = "assignments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     course: Mapped[str | None] = mapped_column(String(100), nullable=True)
     title: Mapped[str] = mapped_column(String(200))
     due_at: Mapped[datetime] = mapped_column(DateTime, index=True)
@@ -56,7 +56,7 @@ class Exam(Base):
     __tablename__ = "exams"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     course: Mapped[str] = mapped_column(String(100))
     title: Mapped[str] = mapped_column(String(200), default="시험")
     starts_at: Mapped[datetime] = mapped_column(DateTime, index=True)
