@@ -27,6 +27,7 @@ DASHBOARD_TEXT = """## 🏫 학교생활 대시보드
 📅 **학사일정** 앞으로 45일 일정
 📝 **과제** 남은 과제 · ➕ **과제 추가**
 🎓 **졸업요건** 들은 과목 입력 → 남은 학점·안 들은 전공 과목
+🧠 **지침** 봇 말투 같은 지침 보기·추가·삭제, 대화 기억 지우기
 
 새 학과 공지와 수강신청·장학금·휴복학 일정(7일 전·전날)은 #알림 채널로 와요."""
 
@@ -96,6 +97,10 @@ class DashboardView(GuardedView):
     @discord.ui.button(label="졸업요건", emoji="🎓", style=discord.ButtonStyle.secondary, custom_id="dash:grad", row=1)
     async def grad(self, interaction: discord.Interaction, _: discord.ui.Button):
         await _answer(interaction, lambda: cmd.grad_summary(interaction.user.id), view=GradView())
+
+    @discord.ui.button(label="지침", emoji="🧠", style=discord.ButtonStyle.secondary, custom_id="dash:guide", row=2)
+    async def guide(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await _answer(interaction, lambda: cmd.guidelines_text(interaction.user.id), view=GuidelineView())
 
 
 # ---------- 학식 ----------
@@ -206,3 +211,48 @@ class GradView(GuardedView):
     @discord.ui.button(label="새로고침", emoji="🔄", style=discord.ButtonStyle.secondary)
     async def refresh(self, interaction: discord.Interaction, _: discord.ui.Button):
         await _answer(interaction, lambda: cmd.grad_summary(interaction.user.id), view=GradView())
+
+
+# ---------- 지침 · 대화 기억 ----------
+class GuidelineModal(discord.ui.Modal, title="지침 추가"):
+    text = discord.ui.TextInput(label="봇이 항상 지킬 것", placeholder="예: 반말로 친근하게 말해줘", max_length=300,
+                                style=discord.TextStyle.paragraph)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await _answer(interaction, lambda: cmd.guideline_add(interaction.user.id, self.text.value))
+
+
+class DeleteGuidelineSelect(discord.ui.Select):
+    def __init__(self, rows) -> None:
+        options = [discord.SelectOption(label=f"#{g.id} {g.text}"[:100], value=str(g.id)) for g in rows[-25:]]
+        super().__init__(placeholder="지울 지침 고르기", min_values=1, max_values=len(options), options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await _answer(interaction, lambda: cmd.guideline_delete(interaction.user.id, [int(v) for v in self.values]))
+
+
+class GuidelineView(GuardedView):
+    def __init__(self) -> None:
+        super().__init__(timeout=600)
+
+    @discord.ui.button(label="지침 추가", emoji="➕", style=discord.ButtonStyle.primary)
+    async def add(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(GuidelineModal())
+
+    @discord.ui.button(label="지침 삭제", emoji="🗑", style=discord.ButtonStyle.danger)
+    async def remove(self, interaction: discord.Interaction, _: discord.ui.Button):
+        from app import repository as repo
+        from app.db import session_scope
+
+        with session_scope() as s:
+            rows = repo.list_guidelines(s, interaction.user.id)
+        if not rows:
+            await interaction.response.send_message("저장된 지침이 없어요.", ephemeral=True)
+            return
+        view = GuardedView(timeout=300)
+        view.add_item(DeleteGuidelineSelect(rows))
+        await interaction.response.send_message("지울 지침을 골라 주세요.", view=view, ephemeral=True)
+
+    @discord.ui.button(label="대화 기억 지우기", emoji="🧹", style=discord.ButtonStyle.secondary)
+    async def clear(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await _answer(interaction, lambda: cmd.chat_clear(interaction.user.id))

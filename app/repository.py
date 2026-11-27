@@ -6,8 +6,8 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import (AcademicEventRow, Assignment, ClassSession, CompletedCourse, Exam, KeyValue,
-                        SeenNotice, SentReminder)
+from app.models import (AcademicEventRow, Assignment, ChatMessage, ClassSession, CompletedCourse, Exam, Guideline,
+                        KeyValue, SeenNotice, SentReminder)
 
 
 # ---------- 시간표 ----------
@@ -194,3 +194,46 @@ def get_value(s: Session, key: str) -> str | None:
 
 def set_value(s: Session, key: str, value: str) -> None:
     s.merge(KeyValue(key=key, value=value))
+
+
+# ---------- 대화 기억 ----------
+def add_chat(s: Session, user_id: int, role: str, text: str, at: datetime, keep: int) -> None:
+    s.add(ChatMessage(user_id=user_id, role=role, text=text[:1500], created_at=at))
+    s.flush()
+    ids = list(s.scalars(select(ChatMessage.id).where(ChatMessage.user_id == user_id)
+                         .order_by(ChatMessage.id.desc()).offset(keep)))
+    for old_id in ids:
+        s.delete(s.get(ChatMessage, old_id))
+
+
+def recent_chat(s: Session, user_id: int, limit: int) -> list[ChatMessage]:
+    rows = list(s.scalars(select(ChatMessage).where(ChatMessage.user_id == user_id)
+                          .order_by(ChatMessage.id.desc()).limit(limit)))
+    return rows[::-1]
+
+
+def clear_chat(s: Session, user_id: int) -> int:
+    rows = list(s.scalars(select(ChatMessage).where(ChatMessage.user_id == user_id)))
+    for r in rows:
+        s.delete(r)
+    return len(rows)
+
+
+# ---------- 지침 ----------
+def add_guideline(s: Session, user_id: int, text: str, at: datetime) -> Guideline:
+    row = Guideline(user_id=user_id, text=text[:300], created_at=at)
+    s.add(row)
+    s.flush()
+    return row
+
+
+def list_guidelines(s: Session, user_id: int) -> list[Guideline]:
+    return list(s.scalars(select(Guideline).where(Guideline.user_id == user_id).order_by(Guideline.id)))
+
+
+def delete_guideline(s: Session, user_id: int, guideline_id: int) -> bool:
+    row = s.get(Guideline, guideline_id)
+    if row is None or row.user_id != user_id:
+        return False
+    s.delete(row)
+    return True

@@ -158,3 +158,39 @@ def _pick_category(category: str | None, name: str) -> str:
     if category not in cur.CATEGORIES:
         raise ParseError(f"구분은 {', '.join(cur.CATEGORIES)} 중 하나로 적어 주세요 (전필/전선/교필/교선도 돼요)")
     return category
+
+
+# ---------- 지침 · 대화 기억 ----------
+def guidelines_text(user_id: int) -> str:
+    with session_scope() as s:
+        rows = repo.list_guidelines(s, user_id)
+        n_chat = len(repo.recent_chat(s, user_id, 10_000))
+    lines = ["🧠 **봇 지침** (대화할 때마다 지켜요)"]
+    lines += [f"  #{g.id} {g.text}" for g in rows] or ["  아직 없어요. 봇에게 \"앞으로 반말로 해줘\" 처럼 말하거나 ➕ 로 추가하세요."]
+    lines.append(f"\n💬 기억하는 최근 대화: {n_chat}개")
+    return "\n".join(lines)
+
+
+def guideline_add(user_id: int, text: str) -> str:
+    from app.config import settings
+
+    text = text.strip()
+    if not text:
+        raise ParseError("지침 내용을 적어 주세요")
+    with session_scope() as s:
+        if len(repo.list_guidelines(s, user_id)) >= settings.max_guidelines:
+            raise ParseError(f"지침은 {settings.max_guidelines}개까지 저장돼요")
+        row = repo.add_guideline(s, user_id, text, now())
+        return f"📌 지침 #{row.id} 저장: {row.text}"
+
+
+def guideline_delete(user_id: int, ids: list[int]) -> str:
+    with session_scope() as s:
+        n = sum(repo.delete_guideline(s, user_id, i) for i in ids)
+    return f"지침 {n}개를 지웠어요." if n else "지울 지침을 찾지 못했어요."
+
+
+def chat_clear(user_id: int) -> str:
+    with session_scope() as s:
+        n = repo.clear_chat(s, user_id)
+    return f"대화 기억 {n}개를 지웠어요. 지침은 그대로예요."

@@ -121,3 +121,26 @@ class KeyValue(Base):
 
     key: Mapped[str] = mapped_column(String(50), primary_key=True)
     value: Mapped[str] = mapped_column(String(200))
+
+
+class ChatMessage(Base):
+    """대화 기억: 사용자별 최근 대화 (오래된 건 자동 삭제, 사용자당 CHAT_HISTORY_LIMIT 개)."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    role: Mapped[str] = mapped_column(String(10))  # "user" | "bot"
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Guideline(Base):
+    """사용자가 정한 봇 지침 (예: "반말로 해줘"). 매 대화에 넣습니다."""
+
+    __tablename__ = "guidelines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    text: Mapped[str] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime)
