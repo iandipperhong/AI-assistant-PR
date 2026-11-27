@@ -5,8 +5,9 @@
 
 ## 로드맵
 
-- **1단계 (지금)**: 시간표/과제/시험 등록, 마감 알림, 자연어 질문 · 등록
-- **2단계**: 학식·학사일정 자동 수집 → 조사 결과 [docs/uos-sources.md](docs/uos-sources.md), 파서 초안 `app/campus/`
+- **1단계**: 시간표/과제/시험 등록, 마감 알림, 자연어 질문 · 등록
+- **2단계 (지금)**: 버튼 대시보드(학식·학과 공지·학사일정·과제·졸업요건), #알림 채널(학과 새 공지, 학사일정 7일 전·전날)
+  → 데이터 출처 [docs/uos-sources.md](docs/uos-sources.md)
 - **3단계**: 시험 준비 도우미 (`Exam.scope` 칸 준비됨)
 
 ## 구조
@@ -20,11 +21,14 @@ app/
   parsing.py       "12/03 23:59", "월 09:00-10:15" 같은 입력 파싱
   assistant.py     자연어 처리 (LLM이 JSON으로 행동을 고르고, DB 저장은 코드가 검증 후 처리)
   reminders.py     과제 24시간/3시간 전, 시험 3일/1일 전 알림 계산 (중복 방지)
-  bot/client.py    디스코드: 슬래시 명령어 등록, DM/멘션 대화, 5분마다 DM 알림
+  bot/client.py    디스코드: 슬래시 명령어 등록, DM/멘션 대화, DM 알림, 대시보드 고정, #알림 채널 작업
+  bot/dashboard.py 버튼 대시보드 (버튼·드롭다운·입력창)
+  campus_alerts.py 학과 새 공지 / 학사일정 미리 알림 계산
+  graduation.py    졸업요건 계산 (남은 학점, 안 들은 전공 과목)
   bot/commands.py  명령어 동작 (디스코드와 분리된 순수 함수)
   bot/formatting.py 목록 → 메시지 문자열
   llm/             LLM 추상화: gemini(기본) · claude · ollama
-  campus/          (2단계) 학식/학사일정 파서 초안
+  campus/          학식·학사일정(학교 홈페이지), 학과 공지(lauos.or.kr), 조경학과 교과과정
 deploy/            systemd 서비스 파일, 서버 설치 스크립트
 .github/workflows/ 자동 배포 (GitHub Actions)
 tests/             pytest
@@ -34,6 +38,23 @@ tests/             pytest
 
 `.env` 의 `LLM_PROVIDER` 만 바꾸면 됩니다: `gemini`(기본, 무료 티어) · `claude` · `ollama`(로컬).
 다른 모델을 붙이려면 `app/llm/base.py` 의 `LLMProvider.generate()` 하나만 구현하세요.
+
+## 버튼 대시보드 (#대시보드 채널)
+
+봇이 켜질 때 `DASHBOARD_CHANNEL_ID` 채널에 버튼 메시지를 올리고 고정합니다. 버튼을 누르면 **나에게만 보이는** 답이 옵니다.
+
+| 버튼 | 하는 일 |
+|---|---|
+| 🍚 학식 | 식당(학생회관 1층 · 이룸라운지 · 양식당 · 자연과학관) 고르면 오늘 메뉴 |
+| 📢 공지 | 조경학과 홈페이지(lauos.or.kr) 최근 공지 10개 |
+| 📅 학사일정 | 앞으로 45일 학사일정 (⭐ = 알림 채널로 미리 알려 주는 일정) |
+| 📝 과제 / ➕ 과제 추가 | 남은 과제 목록 / 입력창으로 과제 등록 (마감 알림은 DM) |
+| 🎓 졸업요건 | 들은 과목 입력 → 학점 합계, 남은 학점, 안 들은 전공 과목 |
+
+**#알림 채널** (`ALERT_CHANNEL_ID`): 조경학과 홈페이지 새 공지 전부(30분마다 확인), 수강신청·장학금·휴학·복학·전과·조기졸업·기말시험 등 학사일정 시작 **7일 전과 전날**(오전 9시 이후).
+처음 켤 때 이미 있던 공지는 올리지 않고, 그 뒤 새로 올라온 글만 알립니다.
+
+**졸업요건 기준값**: 전공안내서에는 졸업학점·전공필수·선수과목이 없어서 `app/campus/landscape_curriculum.py` 의 `GRAD_RULES`, `REQUIRED_COURSES`, `PREREQUISITES` 를 비워 두었습니다. 학과 요람에서 확인한 값을 여기에 채우면 남은 학점과 미이수 전공필수가 표시됩니다.
 
 ## 봇 명령어 (슬래시 명령어)
 
@@ -61,7 +82,8 @@ tests/             pytest
 2. **Bot** 탭 → **Reset Token** → 토큰 복사 (`DISCORD_BOT_TOKEN`)
    - 특권 인텐트(Message Content 등)는 켤 필요 없습니다. DM과 멘션 내용은 기본으로 읽힙니다.
 3. **Installation** 탭 → Installation Contexts 에서 **User Install** 과 **Guild Install** 둘 다 체크
-   - Guild Install 의 scopes: `bot`, `applications.commands` / 권한: `Send Messages`, `Read Message History`
+   - Guild Install 의 scopes: `bot`, `applications.commands` / 권한: `View Channels`, `Send Messages`, `Read Message History`, `Pin Messages`(또는 `Manage Messages`)
+   - 이미 초대했다면: 디스코드 서버 설정 → 역할 → 봇 역할에 **메시지 고정**(또는 메시지 관리) 권한을 켜거나, #대시보드 채널 설정 → 권한에서 봇에게 허용
    - User Install 의 scopes: `applications.commands`
 4. Install Link 로 내 서버에 초대 (또는 내 계정에 설치)
    - 봇이 DM 알림을 보내려면 **봇과 같은 서버에 있거나, 봇에게 먼저 DM을 한 번 보내 두는 것**이 안전합니다.
@@ -100,6 +122,8 @@ GitHub 의 배포 컴퓨터는 매번 IP 가 바뀌어서, "내 IP" 로만 열�
 | `GEMINI_API_KEY` | Gemini API 키 | 위 2번 단계 |
 | `ALLOWED_USER_IDS` | (선택) 내 디스코드 사용자 ID | 아래 4번 단계. 처음엔 비워도 배포됩니다 |
 | `DISCORD_GUILD_ID` | (선택) 내 디스코드 서버 ID | 위 1번 단계의 5 |
+| `DASHBOARD_CHANNEL_ID` | (선택) #대시보드 채널 ID | 채널 우클릭 → **채널 ID 복사** (개발자 모드 필요) |
+| `ALERT_CHANNEL_ID` | (선택) #알림 채널 ID | 위와 같음 |
 
 > 서버를 **중지했다가 다시 켜면 퍼블릭 IP 가 바뀝니다.** 그러면 `EC2_HOST` 를 새 IP 로 다시 등록하세요. (바뀌지 않게 하려면 AWS 의 "탄력적 IP" 를 붙이면 됩니다)
 

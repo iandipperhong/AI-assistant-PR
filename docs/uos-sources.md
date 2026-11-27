@@ -27,6 +27,17 @@
 - 1년에 몇 번만 바뀌므로 하루 한 번 가져와 DB에 저장하면 충분합니다.
 - 파서 초안: `app/campus/uos_calendar.py`
 
+## 조경학과 공지
+
+- 페이지: https://lauos.or.kr/notice (워드프레스 KBoard)
+- 목록 `table tbody tr`: 링크의 `uid=` 가 글 번호, 제목 `.kboard-default-cut-strings`, 날짜 `td.kboard-list-date`
+- 파서: `app/campus/lauos_notice.py`. 30분마다 확인해서 처음 보는 uid 만 #알림 채널로 보냅니다.
+
+## SSO 건너뛰기 (2026-11-27 확인)
+
+`www.uos.ac.kr` 페이지 주소에 `identified=anonymous` 를 붙이면 SSO 자바스크립트 리다이렉트 없이, 쿠키 없이 바로 열립니다.
+학식(`/food/placeList.do?identified=anonymous&rstcde=010`, POST `search_date`)과 학사일정(POST `list_id=CA1&year_code=YYYY`) 모두 확인했습니다.
+
 ## 주의할 점
 
 - `www.uos.ac.kr` 은 처음 접속하면 SSO 페이지(`/exsignon/sso/sso_index.jsp`)를 거쳐 `identified=anonymous` 로 돌아옵니다.

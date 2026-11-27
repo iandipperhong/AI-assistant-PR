@@ -1,12 +1,12 @@
-"""데이터 모델: 시간표, 과제, 시험, 보낸 알림 기록.
+"""데이터 모델: 시간표, 과제, 시험, 보낸 알림 기록, 졸업요건용 이수 과목, 학교 공지/학사일정 캐시.
 
 시각은 모두 '한국 시간 기준 naive datetime'으로 저장합니다 (SQLite에 타임존이 없어서).
 """
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, Text, Time, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Integer, String, Text, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -75,7 +75,49 @@ class SentReminder(Base):
     __table_args__ = (UniqueConstraint("kind", "item_id", "hours_before"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    kind: Mapped[str] = mapped_column(String(20))  # "assignment" | "exam"
+    kind: Mapped[str] = mapped_column(String(20))  # "assignment" | "exam" | "calendar"
     item_id: Mapped[int] = mapped_column(Integer)
     hours_before: Mapped[int] = mapped_column(Integer)
     sent_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class CompletedCourse(Base):
+    """졸업요건 계산용: 내가 이미 들은 과목."""
+
+    __tablename__ = "completed_courses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    credits: Mapped[int] = mapped_column(Integer, default=3)
+    category: Mapped[str] = mapped_column(String(20), default="전공선택")  # 전공필수/전공선택/교양필수/...
+
+
+class AcademicEventRow(Base):
+    """학교 홈페이지에서 가져온 학사일정 (하루 한 번 새로고침)."""
+
+    __tablename__ = "academic_events"
+    __table_args__ = (UniqueConstraint("start", "end", "title"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    start: Mapped[date] = mapped_column(Date, index=True)
+    end: Mapped[date] = mapped_column(Date)
+    title: Mapped[str] = mapped_column(String(300))
+
+
+class SeenNotice(Base):
+    """알림 채널에 이미 올린(또는 처음 실행 때 있던) 학과 공지 글 번호."""
+
+    __tablename__ = "seen_notices"
+
+    uid: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seen_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class KeyValue(Base):
+    """작은 설정값 저장 (예: 고정된 대시보드 메시지 ID)."""
+
+    __tablename__ = "key_values"
+
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    value: Mapped[str] = mapped_column(String(200))

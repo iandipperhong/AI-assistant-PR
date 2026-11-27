@@ -44,6 +44,16 @@ class Settings:
     )
     reminder_interval_seconds: int = int(os.getenv("REMINDER_INTERVAL_SECONDS", "300"))
 
+    # 버튼 대시보드를 고정할 채널, 학과 공지·학사일정 알림을 올릴 채널 (디스코드 채널 ID)
+    dashboard_channel_id: int | None = int(os.getenv("DASHBOARD_CHANNEL_ID")) if os.getenv("DASHBOARD_CHANNEL_ID") else None
+    alert_channel_id: int | None = int(os.getenv("ALERT_CHANNEL_ID")) if os.getenv("ALERT_CHANNEL_ID") else None
+    notice_check_minutes: int = int(os.getenv("NOTICE_CHECK_MINUTES", "30"))
+    # 학사일정 알림: 시작 며칠 전에 알릴지, 몇 시 이후에 보낼지
+    calendar_remind_days: list[int] = field(
+        default_factory=lambda: _int_list(os.getenv("CALENDAR_REMIND_DAYS"), [7, 1])
+    )
+    calendar_alert_hour: int = int(os.getenv("CALENDAR_ALERT_HOUR", "9"))
+
     @property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)
