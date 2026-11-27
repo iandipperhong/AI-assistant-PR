@@ -144,3 +144,14 @@ def test_grad_add_validation():
     with pytest.raises(ParseError):
         cmd.grad_add(7, "과목", "3", "아무거나")
     assert "전공선택" in cmd.grad_add(7, "조경계획", "", "")
+
+
+def test_curriculum_aliases_and_semesters():
+    from app.campus import landscape_curriculum as cur
+
+    assert set(cur.SEMESTERS) <= {cur.normalize(c) for c in cur.ALL_MAJOR_COURSES}
+    assert cur.normalize("공원 및 오픈스페이스설계 스튜디오") == cur.normalize("공원및그린네트워크설계스튜디오")
+    assert cur.semester_label("조경 캡스톤디자인") == "4학년 1학기"
+    assert cur.semester_label("환경심리학") is None
+    cmd.grad_quick_add(7, ["단지및커뮤니티공간설계스튜디오"])
+    assert "이미 다" in cmd.grad_quick_add(7, ["단지 및 기반시설설계 스튜디오"])
