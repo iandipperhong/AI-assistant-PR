@@ -28,7 +28,7 @@ def summary(courses: list[CompletedCourse], rules: dict[str, int | None] | None 
     t = totals(courses)
     taken = {cur.normalize(c.name) for c in courses}
 
-    lines = ["🎓 **졸업요건** (조경학과, 2026 입학생 기준)", "", "**학점**"]
+    lines = ["🎓 **졸업요건** (조경학과, 2024 입학생 기준)", "", "**학점**"]
     for key, need in rules.items():
         have = t.get(key, 0)
         if need is None:
@@ -60,7 +60,7 @@ def summary(courses: list[CompletedCourse], rules: dict[str, int | None] | None 
         if warn:
             lines += ["", "**선수과목 아직 안 들음**"] + warn
 
-    lines += ["", "**안 들은 전공 과목** (2026 교과과정)"]
+    lines += ["", "**안 들은 전공 과목** (2024 교과과정)"]
     for year, names in sorted(cur.CURRICULUM.items()):
         left = [n for n in names if cur.normalize(n) not in taken]
         lines.append(f"  {year}학년: " + (", ".join(left) if left else "모두 이수 ✅"))

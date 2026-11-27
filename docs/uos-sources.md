@@ -42,7 +42,8 @@
 
 - 페이지: https://www.uos.ac.kr/kor/html/uaInfo/major/curriculum/curriculum2026.do (학과별 hwp 다운로드)
 - 다운로드: POST `/common/dir/FileDown.do` (`file_path=/data/26_cu/`, `file_upNm`, `file_orgNm` = 파일 이름)
-- 조경학과: `7. 조경학과.hwp`, 졸업학점: `2026 졸업최저이수학점.hwp` → `app/campus/landscape_curriculum.py` 에 옮겨 둠
+- 연도별 페이지: `curriculum2024.do` 처럼 연도만 바뀜, 파일 경로 `/data/24_cu/`
+- 2024 입학 기준(현재 봇): `7. 조경학과.hwp`, `2024 졸업최저이수학점_2024.8.hwp` → `app/campus/landscape_curriculum.py`
 - 공통 졸업요건: https://www.uos.ac.kr/kor/html/uaInfo/graduate/terms/terms.do
 
 ## 주의할 점

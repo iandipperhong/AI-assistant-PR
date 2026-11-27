@@ -137,7 +137,7 @@ def grad_quick_add(user_id: int, names: list[str]) -> str:
             added.append(name)
     if not added:
         return "이미 다 들어 있어요."
-    return f"{len(added)}과목 추가했어요: {', '.join(added)}\n(학점·구분은 2026 교과과정 기준으로 넣었어요)"
+    return f"{len(added)}과목 추가했어요: {', '.join(added)}\n(학점·구분은 2024 교과과정 기준으로 넣었어요)"
 
 
 def grad_delete(user_id: int, course_ids: list[int]) -> str:

@@ -162,6 +162,7 @@ def test_curriculum_aliases_and_semesters():
     assert cur.normalize("공원 및 오픈스페이스설계 스튜디오") == cur.normalize("공원및그린네트워크설계스튜디오")
     assert cur.semester_label("조경 캡스톤디자인") == "4학년 1학기"
     assert cur.semester_label("환경심리학") == "1학년 2학기"
+    assert cur.GRAD_RULES["교양필수"] == 13  # 2024 입학생
     assert cur.semester_label("모르는과목") is None
     cmd.grad_quick_add(7, ["단지및커뮤니티공간설계스튜디오"])
     assert "이미 다" in cmd.grad_quick_add(7, ["단지 및 기반시설설계 스튜디오"])
