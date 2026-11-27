@@ -25,7 +25,8 @@ app/
   bot/formatting.py 목록 → 메시지 문자열
   llm/             LLM 추상화: gemini(기본) · claude · ollama
   campus/          (2단계) 학식/학사일정 파서 초안
-deploy/            systemd 서비스 파일
+deploy/            systemd 서비스 파일, 서버 설치 스크립트
+.github/workflows/ 자동 배포 (GitHub Actions)
 tests/             pytest
 ```
 
@@ -70,23 +71,70 @@ tests/             pytest
 ### 2. Gemini API 키
 https://aistudio.google.com/apikey 에서 발급 (무료)
 
-### 3. AWS 서버에서
-```bash
-git clone https://github.com/iandipperhong/AI-assistant-PR.git
-cd AI-assistant-PR
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # 토큰, API 키 입력
-uvicorn app.main:api --host 127.0.0.1 --port 8000
-```
+### 3. 자동 배포 (GitHub Actions → AWS 서버)
+
+`main` 브랜치에 코드가 올라가면 GitHub 가 알아서 테스트 → 서버로 복사 → 설치 → 봇 재시작까지 합니다.
+서버에 직접 들어가서 할 일은 없습니다. (git, python 가상환경 등도 처음 배포 때 자동 설치)
+
+#### 3-1. AWS 보안 그룹에서 SSH 열기
+GitHub 의 배포 컴퓨터는 매번 IP 가 바뀌어서, "내 IP" 로만 열어 두면 접속하지 못합니다.
+
+1. AWS 콘솔 → **EC2** → **인스턴스** → 내 서버 클릭 → 아래 **보안** 탭 → 보안 그룹 이름 클릭
+2. **인바운드 규칙 편집** → SSH(22) 규칙의 소스를 **0.0.0.0/0 (Anywhere-IPv4)** 로 → 저장
+
+> 괜찮을까요? EC2(Ubuntu)는 비밀번호 로그인이 꺼져 있고 **.pem 키가 있어야만** 들어갈 수 있어서, 키만 잘 지키면 안전합니다.
+
+#### 3-2. GitHub 에 Secrets 등록
+토큰과 키는 코드에 넣지 않고 GitHub 의 금고(Secrets)에 넣습니다. 등록한 값은 다시 볼 수 없고 로그에도 `***` 로 가려집니다.
+**채팅이나 코드에 붙여 넣지 마세요.**
+
+1. GitHub 저장소 페이지 → 위쪽 **Settings** 탭
+2. 왼쪽 메뉴 **Secrets and variables** → **Actions**
+3. **New repository secret** 버튼 → Name 과 Secret 을 넣고 **Add secret**. 아래 표대로 하나씩 반복
+
+| Name (그대로 입력) | 넣을 값 | 어디서 찾나요 |
+|---|---|---|
+| `EC2_HOST` | 서버 IP (예: `3.35.123.45`) | AWS 콘솔 → EC2 → 인스턴스 → **퍼블릭 IPv4 주소** |
+| `EC2_SSH_KEY` | `.pem` 파일 내용 **전체** | 서버 만들 때 받은 `.pem` 파일을 **메모장으로 열어** `-----BEGIN` 줄부터 `-----END ... KEY-----` 줄까지 전부 복사 |
+| `DISCORD_BOT_TOKEN` | 디스코드 봇 토큰 | 위 1번 단계 |
+| `GEMINI_API_KEY` | Gemini API 키 | 위 2번 단계 |
+| `ALLOWED_USER_IDS` | (선택) 내 디스코드 사용자 ID | 아래 4번 단계. 처음엔 비워도 배포됩니다 |
+| `DISCORD_GUILD_ID` | (선택) 내 디스코드 서버 ID | 위 1번 단계의 5 |
+
+> 서버를 **중지했다가 다시 켜면 퍼블릭 IP 가 바뀝니다.** 그러면 `EC2_HOST` 를 새 IP 로 다시 등록하세요. (바뀌지 않게 하려면 AWS 의 "탄력적 IP" 를 붙이면 됩니다)
+
+#### 3-3. 배포하기
+- PR 을 `main` 에 병합(Merge)하면 자동으로 시작합니다.
+- 코드 변경 없이 다시 배포하려면: 저장소 → **Actions** 탭 → 왼쪽 **서버에 자동 배포** → **Run workflow**
+- 진행 상황도 **Actions** 탭에서 봅니다. 초록 체크면 성공, 빨간 X 면 눌러서 어느 단계에서 실패했는지 확인하세요.
+  - "Secrets 확인" 실패 → 빠진 Secret 이름이 나옵니다
+  - "SSH 접속 준비" 실패 → 보안 그룹(3-1), `EC2_HOST` IP, `EC2_SSH_KEY` 내용 확인
+  - "설치하고 봇 재시작" 실패 → 아래에 봇 로그가 나옵니다 (토큰이 틀리면 `LoginFailure`)
+
+Secret 값을 바꾼 뒤에는 **Run workflow** 로 한 번 다시 배포해야 서버에 반영됩니다.
 
 ### 4. 나만 쓰도록 잠그기
-디스코드에서 `/whoami` → 나온 ID를 `.env` 의 `ALLOWED_USER_IDS` 에 넣고 재시작.
+디스코드에서 `/whoami` → 나온 ID 를 GitHub Secret `ALLOWED_USER_IDS` 에 등록 → **Run workflow** 로 다시 배포.
 
-### 5. 상시 실행
-`deploy/uos-assistant.service` 를 경로에 맞게 고쳐서 systemd 에 등록.
+### 5. 서버에서 상태 보기 (필요할 때만)
+```bash
+sudo systemctl status uos-assistant     # 실행 중인지
+sudo journalctl -u uos-assistant -f     # 실시간 로그 (Ctrl+C 로 나가기)
+```
+봇은 디스코드 쪽으로 연결을 여는 방식이라 서버에 22번 말고 다른 포트를 열 필요가 없습니다. `/health` 는 서버 안(127.0.0.1)에서만 열려 있습니다.
+데이터(SQLite DB)는 `/home/ubuntu/uos-assistant-data/` 에 있어 다시 배포해도 지워지지 않습니다.
 
-봇은 디스코드 쪽으로 연결을 여는 방식이라 서버에 포트를 열거나 도메인이 없어도 됩니다. `/health` 는 127.0.0.1 에서만 열어 두었습니다.
+<details>
+<summary>자동 배포 없이 직접 설치하려면</summary>
+
+```bash
+sudo apt-get update && sudo apt-get install -y git python3-venv
+git clone https://github.com/iandipperhong/AI-assistant-PR.git
+cd AI-assistant-PR
+cp .env.example .env   # 토큰, API 키 입력
+bash deploy/server_setup.sh
+```
+</details>
 
 ## 개발
 

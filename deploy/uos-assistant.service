@@ -1,15 +1,16 @@
 # /etc/systemd/system/uos-assistant.service
-# 설치: sudo cp deploy/uos-assistant.service /etc/systemd/system/ && sudo systemctl enable --now uos-assistant
+# 자동 배포(deploy/server_setup.sh)가 이 파일을 복사해 등록합니다.
 [Unit]
 Description=UOS 생활 비서 디스코드 봇
 After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/AI-assistant-PR
 EnvironmentFile=/home/ubuntu/AI-assistant-PR/.env
 ExecStart=/home/ubuntu/AI-assistant-PR/.venv/bin/uvicorn app.main:api --host 127.0.0.1 --port 8000
-Restart=on-failure
+Restart=always
 RestartSec=5
 
 [Install]
