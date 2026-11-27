@@ -117,16 +117,31 @@ class AssistantBot(discord.Client):
         except discord.HTTPException:
             log.warning("대시보드 메시지를 고정하지 못했어요. 봇에 '메시지 고정' 권한을 주세요.")
 
+    def _mentions_me(self, message: discord.Message) -> bool:
+        """봇 사용자 멘션, 또는 봇 이름과 같은 '봇 전용 역할' 멘션(@Assistant AI 가 역할로 잡히는 경우)."""
+        if self.user in message.mentions:
+            return True
+        return any(r.tags is not None and r.tags.bot_id == self.user.id for r in message.role_mentions)
+
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or self.user is None:
             return
         is_dm = isinstance(message.channel, discord.DMChannel)
-        if not is_dm and self.user not in message.mentions:
+        if not is_dm and not self._mentions_me(message):
             return  # 서버 채널에서는 @멘션했을 때만 반응
         if not is_allowed(message.author.id):
+            log.info("허용되지 않은 사용자 메시지 무시: %s", message.author.id)
+            await message.reply(f"허용되지 않은 사용자예요. ALLOWED_USER_IDS 에 {message.author.id} 를 추가하세요.",
+                                mention_author=False)
             return
-        text = re.sub(rf"<@!?{self.user.id}>", "", message.content).strip()
+        text = re.sub(rf"<@!?{self.user.id}>|<@&\d+>", "", message.content).strip()
         if not text:
+            # 역할 멘션은 디스코드가 메시지 내용을 봇에게 안 보여줌 (Message Content 권한 없을 때)
+            log.info("멘션은 됐지만 내용이 비어 있음 (역할 멘션일 가능성): %s", message.content[:50])
+            await message.reply(
+                "메시지 내용을 읽지 못했어요 😢\n"
+                "`@` 를 치고 목록에서 **역할이 아닌 봇(앱 표시가 있는 것)** 을 골라 멘션하거나, 저에게 DM 으로 보내 주세요.",
+                mention_author=False)
             return
         async with message.channel.typing():
             reply = await self._chat(message.author.id, text)
