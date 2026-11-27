@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app import repository as repo
-from app.llm.base import LLMError, LLMProvider
+from app.llm.base import LLMError, LLMProvider, explain_llm_error
 from app.models import WEEKDAYS
 from app.parsing import ParseError, parse_time_range, parse_weekday
 
@@ -68,7 +68,8 @@ async def handle_message(llm: LLMProvider, s: Session, user_id: int, text: str, 
         raw = await llm.generate(SYSTEM_PROMPT, prompt, json_mode=True)
     except LLMError as exc:
         log.warning("LLM error: %s", exc)
-        return "지금은 AI 응답을 받을 수 없어요. `/help` 의 명령어로는 계속 쓸 수 있어요."
+        return (f"지금은 AI 응답을 받을 수 없어요. `/help` 의 명령어로는 계속 쓸 수 있어요.\n"
+                f"원인: {explain_llm_error(exc)}")
 
     try:
         result = _extract_json(raw)
