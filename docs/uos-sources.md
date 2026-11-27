@@ -38,6 +38,13 @@
 `www.uos.ac.kr` 페이지 주소에 `identified=anonymous` 를 붙이면 SSO 자바스크립트 리다이렉트 없이, 쿠키 없이 바로 열립니다.
 학식(`/food/placeList.do?identified=anonymous&rstcde=010`, POST `search_date`)과 학사일정(POST `list_id=CA1&year_code=YYYY`) 모두 확인했습니다.
 
+## 교과과정 · 졸업학점 (2026-11-28 확인)
+
+- 페이지: https://www.uos.ac.kr/kor/html/uaInfo/major/curriculum/curriculum2026.do (학과별 hwp 다운로드)
+- 다운로드: POST `/common/dir/FileDown.do` (`file_path=/data/26_cu/`, `file_upNm`, `file_orgNm` = 파일 이름)
+- 조경학과: `7. 조경학과.hwp`, 졸업학점: `2026 졸업최저이수학점.hwp` → `app/campus/landscape_curriculum.py` 에 옮겨 둠
+- 공통 졸업요건: https://www.uos.ac.kr/kor/html/uaInfo/graduate/terms/terms.do
+
 ## 주의할 점
 
 - `www.uos.ac.kr` 은 처음 접속하면 SSO 페이지(`/exsignon/sso/sso_index.jsp`)를 거쳐 `identified=anonymous` 로 돌아옵니다.

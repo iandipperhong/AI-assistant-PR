@@ -138,7 +138,8 @@ class HomeworkModal(discord.ui.Modal, title="과제 추가"):
 # ---------- 졸업요건 ----------
 class CourseModal(discord.ui.Modal, title="들은 과목 직접 입력"):
     name = discord.ui.TextInput(label="과목 이름", placeholder="예: 대학영어", max_length=100)
-    credits = discord.ui.TextInput(label="학점 (비우면 3)", placeholder="3", required=False, max_length=2)
+    credits = discord.ui.TextInput(label="학점 (비우면 교과과정 학점, 모르면 3)", placeholder="3", required=False,
+                                   max_length=2)
     category = discord.ui.TextInput(label="구분 (전필/전선/교필/교선/일선)", placeholder="비우면 자동", required=False,
                                     max_length=10)
 
