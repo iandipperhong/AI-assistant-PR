@@ -6,7 +6,8 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Assignment, ClassSession, Exam, SentReminder
+from app.models import (AcademicEventRow, Assignment, ClassSession, CompletedCourse, Exam, KeyValue,
+                        SeenNotice, SentReminder)
 
 
 # ---------- 시간표 ----------
@@ -127,3 +128,69 @@ def mark_older_windows_sent(s: Session, kind: str, item_id: int, hours_before: i
 def day_bounds(d: date) -> tuple[datetime, datetime]:
     start = datetime.combine(d, time.min)
     return start, start + timedelta(days=1)
+
+
+# ---------- 졸업요건: 이수 과목 ----------
+def add_completed_course(s: Session, user_id: int, name: str, credits: int, category: str) -> CompletedCourse:
+    row = CompletedCourse(user_id=user_id, name=name, credits=credits, category=category)
+    s.add(row)
+    s.flush()
+    return row
+
+
+def list_completed_courses(s: Session, user_id: int) -> list[CompletedCourse]:
+    q = select(CompletedCourse).where(CompletedCourse.user_id == user_id)
+    return list(s.scalars(q.order_by(CompletedCourse.id)))
+
+
+def delete_completed_course(s: Session, user_id: int, course_id: int) -> bool:
+    row = s.get(CompletedCourse, course_id)
+    if row is None or row.user_id != user_id:
+        return False
+    s.delete(row)
+    return True
+
+
+# ---------- 학사일정 캐시 ----------
+def replace_academic_events(s: Session, events, years: set[int]) -> None:
+    """해당 연도에 시작하는 일정을 새로 받은 것으로 바꿉니다. 이미 있는 일정은 id 를 유지(알림 중복 방지)."""
+    existing = {(r.start, r.end, r.title): r for r in s.scalars(select(AcademicEventRow))
+                if r.start.year in years}
+    fresh = {(e.start, e.end, e.title) for e in events if e.start.year in years}
+    for key, row in existing.items():
+        if key not in fresh:
+            s.delete(row)
+    for key in fresh - existing.keys():
+        s.add(AcademicEventRow(start=key[0], end=key[1], title=key[2]))
+    s.flush()
+
+
+def list_academic_events(s: Session, since: date, until: date | None = None) -> list[AcademicEventRow]:
+    q = select(AcademicEventRow).where(AcademicEventRow.end >= since)
+    if until is not None:
+        q = q.where(AcademicEventRow.start <= until)
+    return list(s.scalars(q.order_by(AcademicEventRow.start, AcademicEventRow.id)))
+
+
+def sent_keys(s: Session, kind: str) -> set[tuple[int, int]]:
+    return {(r.item_id, r.hours_before) for r in s.scalars(select(SentReminder).where(SentReminder.kind == kind))}
+
+
+# ---------- 학과 공지 ----------
+def seen_notice_uids(s: Session) -> set[int]:
+    return set(s.scalars(select(SeenNotice.uid)))
+
+
+def mark_notices_seen(s: Session, uids, now: datetime) -> None:
+    for uid in uids:
+        s.merge(SeenNotice(uid=uid, seen_at=now))
+
+
+# ---------- 설정값 ----------
+def get_value(s: Session, key: str) -> str | None:
+    row = s.get(KeyValue, key)
+    return row.value if row else None
+
+
+def set_value(s: Session, key: str, value: str) -> None:
+    s.merge(KeyValue(key=key, value=value))

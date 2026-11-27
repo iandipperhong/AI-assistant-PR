@@ -1,4 +1,4 @@
-"""디스코드 봇: 슬래시 명령어 등록, 자연어 메시지 처리, DM 알림 반복 작업."""
+"""디스코드 봇: 슬래시 명령어, 자연어 메시지, DM 알림, 버튼 대시보드, #알림 채널 (학과 공지·학사일정)."""
 from __future__ import annotations
 
 import logging
@@ -9,8 +9,12 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
+from app import repository as repo
 from app.assistant import handle_message
 from app.bot import commands as cmd
+from app.bot.dashboard import DASHBOARD_TEXT, DashboardView
+from app.campus import lauos_notice
+from app.campus_alerts import calendar_alert_messages, new_notice_messages, refresh_calendar
 from app.clock import now
 from app.config import settings
 from app.db import session_scope
@@ -64,8 +68,11 @@ class AssistantBot(discord.Client):
             allowed_installs=app_commands.AppInstallationType(guild=True, user=True),
         )
         register_commands(self.tree)
+        self._dashboard_ready = False
+        self._calendar_refreshed_on = None
 
     async def setup_hook(self) -> None:
+        self.add_view(DashboardView())  # 재시작 뒤에도 고정 메시지의 버튼이 동작하게
         if settings.discord_guild_id:
             guild = discord.Object(id=settings.discord_guild_id)
             self.tree.copy_global_to(guild=guild)
@@ -73,9 +80,42 @@ class AssistantBot(discord.Client):
         await self.tree.sync()
         self.reminder_loop.change_interval(seconds=settings.reminder_interval_seconds)
         self.reminder_loop.start()
+        if settings.alert_channel_id:
+            self.notice_loop.change_interval(minutes=settings.notice_check_minutes)
+            self.notice_loop.start()
+        self.calendar_loop.start()  # 학사일정은 대시보드 버튼에도 쓰여서 알림 채널이 없어도 새로고침
 
     async def on_ready(self) -> None:
         log.info("Discord bot ready as %s (LLM=%s)", self.user, settings.llm_provider)
+        if settings.dashboard_channel_id and not self._dashboard_ready:
+            self._dashboard_ready = True
+            try:
+                await self.ensure_dashboard()
+            except discord.HTTPException:
+                log.exception("dashboard setup failed")
+
+    async def _channel(self, channel_id: int):
+        return self.get_channel(channel_id) or await self.fetch_channel(channel_id)
+
+    async def ensure_dashboard(self) -> None:
+        """#대시보드 채널에 버튼 메시지를 하나 두고 고정. 이미 있으면 내용만 최신으로 고칩니다."""
+        channel = await self._channel(settings.dashboard_channel_id)
+        with session_scope() as s:
+            saved = repo.get_value(s, "dashboard_message_id")
+        if saved:
+            try:
+                msg = await channel.fetch_message(int(saved))
+                await msg.edit(content=DASHBOARD_TEXT, view=DashboardView())
+                return
+            except discord.NotFound:
+                pass
+        msg = await channel.send(DASHBOARD_TEXT, view=DashboardView())
+        with session_scope() as s:
+            repo.set_value(s, "dashboard_message_id", str(msg.id))
+        try:
+            await msg.pin()
+        except discord.HTTPException:
+            log.warning("대시보드 메시지를 고정하지 못했어요. 봇에 '메시지 고정' 권한을 주세요.")
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or self.user is None:
@@ -112,6 +152,41 @@ class AssistantBot(discord.Client):
     @reminder_loop.before_loop
     async def _wait_ready(self) -> None:
         await self.wait_until_ready()
+
+    async def _post_alerts(self, texts: list[str]) -> None:
+        if not texts or not settings.alert_channel_id:
+            return
+        channel = await self._channel(settings.alert_channel_id)
+        for text in texts:
+            await channel.send(text[:2000])
+
+    @tasks.loop(minutes=30)
+    async def notice_loop(self) -> None:
+        try:
+            notices = await lauos_notice.fetch_notices()
+            await self._post_alerts(new_notice_messages(notices, now()))
+        except Exception:  # 홈페이지 장애가 봇을 멈추지 않게
+            log.exception("notice check failed")
+
+    @tasks.loop(hours=1)
+    async def calendar_loop(self) -> None:
+        at = now()
+        try:
+            if self._calendar_refreshed_on != at.date():
+                count = await refresh_calendar(at.date())
+                self._calendar_refreshed_on = at.date()
+                log.info("학사일정 %d건 새로고침", count)
+        except Exception:
+            log.exception("calendar refresh failed")
+        if not settings.alert_channel_id:
+            return
+        try:
+            await self._post_alerts(calendar_alert_messages(at))
+        except Exception:
+            log.exception("calendar alert failed")
+
+    notice_loop.before_loop(_wait_ready)
+    calendar_loop.before_loop(_wait_ready)
 
 
 def register_commands(tree: app_commands.CommandTree) -> None:

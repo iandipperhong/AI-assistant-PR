@@ -99,12 +99,16 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ALLOWED_USER_IDS: ${{ secrets.ALLOWED_USER_IDS }}
           DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          DASHBOARD_CHANNEL_ID: ${{ secrets.DASHBOARD_CHANNEL_ID }}
+          ALERT_CHANNEL_ID: ${{ secrets.ALERT_CHANNEL_ID }}
         run: |
           umask 077
           {
             printf 'DISCORD_BOT_TOKEN=%s\n' "$DISCORD_BOT_TOKEN"
             printf 'DISCORD_GUILD_ID=%s\n' "$DISCORD_GUILD_ID"
             printf 'ALLOWED_USER_IDS=%s\n' "$ALLOWED_USER_IDS"
+            printf 'DASHBOARD_CHANNEL_ID=%s\n' "$DASHBOARD_CHANNEL_ID"
+            printf 'ALERT_CHANNEL_ID=%s\n' "$ALERT_CHANNEL_ID"
             printf 'LLM_PROVIDER=gemini\n'
             printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY"
             # DB 는 코드 폴더 밖에 두어 배포할 때 지워지지 않게 합니다
