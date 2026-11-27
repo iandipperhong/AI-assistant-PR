@@ -149,7 +149,7 @@ class CourseModal(discord.ui.Modal, title="들은 과목 직접 입력"):
 
 class CurriculumSelect(discord.ui.Select):
     def __init__(self, years: tuple[int, ...]) -> None:
-        options = [discord.SelectOption(label=c[:100], value=c[:100], description=f"{y}학년")
+        options = [discord.SelectOption(label=c[:100], value=c[:100], description=cur.semester_label(c) or f"{y}학년")
                    for y in years for c in cur.CURRICULUM[y]][:25]
         super().__init__(placeholder=f"{'·'.join(map(str, years))}학년 전공 과목 (여러 개 선택)",
                          min_values=1, max_values=len(options), options=options)
